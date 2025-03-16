@@ -1,5 +1,5 @@
 from data.jobs import Jobs
-from flask import Flask, render_template, redirect
+from flask import Flask, render_template, redirect, abort, request
 from data import db_session
 from data.users import User
 from form.user import RegisterForm
@@ -97,6 +97,62 @@ def add_jobs():
         return redirect('/')
     return render_template('jobs.html', title='Adding a job',
                            form=form)
+
+
+@app.route('/jobs/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_jobs(id):
+    form = JobsForm()
+    if request.method == "GET":
+        db_sess = db_session.create_session()
+        job = db_sess.query(Jobs).filter(Jobs.id == id).first()
+        if job:
+            if current_user.id == 1 or job.team_leader == current_user.id:
+                form.title.data = job.job
+                form.teamleader_id.data = job.team_leader
+                form.work_size.data = job.work_size
+                form.collaborators.data = job.collaborators
+                form.is_finished.data = job.is_finished
+            else:
+                abort(403)
+        else:
+            abort(404)
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        job = db_sess.query(Jobs).filter(Jobs.id == id).first()
+        if job:
+            if current_user.id == 1 or job.team_leader == current_user.id:
+                job.job = form.title.data
+                job.team_leader = form.teamleader_id.data
+                job.work_size = form.work_size.data
+                job.collaborators = form.collaborators.data
+                job.is_finished = form.is_finished.data
+                db_sess.commit()
+                return redirect('/')
+            else:
+                abort(403)  # Forbidden
+        else:
+            abort(404)  # Not Found
+
+    return render_template('jobs.html',
+                           title='Editing a work',
+                           form=form)
+
+
+@app.route('/jobs_delete/<int:id>', methods=['GET', 'POST'])
+@login_required
+def jobs_delete(id):
+    db_sess = db_session.create_session()
+    job = db_sess.query(Jobs).filter(Jobs.id == id).first()
+    if job:
+        if current_user.id == 1 or job.team_leader == current_user.id:
+            db_sess.delete(job)
+            db_sess.commit()
+        else:
+            abort(403)
+    else:
+        abort(404)
+    return redirect('/')
 
 
 def main():
